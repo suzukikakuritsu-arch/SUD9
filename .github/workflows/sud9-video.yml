@@ -1,0 +1,87 @@
+name: SUD9.0 無主体宇宙動画自動生成
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # 手動実行ボタン
+
+jobs:
+  render-videos:
+    name: 🌌 SUD9.0 Video Rendering
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Setup Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: 📦 Install FFmpeg (動画エンコード)
+      run: |
+        sudo apt update
+        sudo apt install -y ffmpeg
+        
+    - name: 📋 Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install matplotlib[animation]  # アニメーション必須
+        
+    - name: 🚀 Generate SUD9.0 Evolution Data
+      run: python sud9_data.py
+      
+    - name: 🎥 Render Phase Space Video
+      run: python sud9_video.py --type phasespace
+      
+    - name: 🎥 Render 3D Manifold Video
+      run: python sud9_video.py --type manifold
+      
+    - name: 📊 Create Final Report
+      run: python sud9_report.py
+      
+    - name: 📈 Update Tensor OS Badge
+      uses: schneegans/dynamic-badges-action@v1.1.1
+      with:
+        auth: ${{ secrets.GITHUB_TOKEN }}
+        gistID: ${{ secrets.GIST_ID }}
+        filename: sud9-status.json
+        label: Tensor OS
+        message: ${{ steps.report.outputs.final_os }}
+        color: brightgreen
+        
+    - name: 🚀 Upload Videos & Assets
+      uses: actions/upload-artifact@v4
+      with:
+        name: sud9-videos
+        path: |
+          *.mp4
+          *.png
+          sud9_evolution.json
+        retention-days: 30
+        
+    - name: 🌟 Deploy to GitHub Pages (Demo)
+      if: github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs/
+        enable_jekyll: false
+        
+  notify:
+    name: 📱 Discord/Status Notification
+    needs: render-videos
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: 📤 Notify Discord
+      uses: Ilshidur/action-discord@master
+      with:
+        args: |
+          🌌 **SUD9.0 自動レンダリング完了!**
+          Tensor OS: `${{ needs.render-videos.outputs.final_os }}`
+          Status: `${{ job.status }}`
+        webhook: ${{ secrets.DISCORD_WEBHOOK }}
