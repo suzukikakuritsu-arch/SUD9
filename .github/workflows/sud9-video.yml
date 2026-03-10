@@ -1,116 +1,26 @@
-name: 🌌 SUD9.0 無主体宇宙動画自動生成
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+name: 🌌 SUD9.0 自動実行
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
-  render-videos:
-    name: SUD9.0 Video Rendering
+  sud9:
     runs-on: ubuntu-latest
-    
-    outputs:
-      final_os: ${{ steps.report.outputs.final_os }}
-      
     steps:
-    - name: 📥 Checkout
-      uses: actions/checkout@v4
-      
-    - name: 🐍 Python 3.11
-      uses: actions/setup-python@v5
+    - uses: actions/checkout@v4
+    
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         
-    - name: 🎬 Install FFmpeg
-      run: |
-        sudo apt update
-        sudo apt install -y ffmpeg
-        
-    - name: 📦 Dependencies
-      run: |
-        pip install -r requirements.txt
-        pip install matplotlib[animation]
-        
-    - name: 🚀 Generate SUD9.0 Data
-      id: data
-      run: |
-        python sud9_data.py
-        echo "final_os=$(cat sud9_evolution.json | jq -r '.final_os')" >> $GITHUB_OUTPUT
-        
-    - name: 🎥 Phase Space Video
-      run: python sud9_video.py --type phasespace
+    - name: 📦 インストール
+      run: pip install numpy matplotlib
       
-    - name: 🎥 3D Manifold Video
-      run: python sud9_video.py --type manifold
+    - name: 🚀 SUD9.0実行  ← **ここを修正**
+      run: python sud9_run.py     # sud9_data.py → sud9_run.py
       
-    - name: 📊 Final Report
-      id: report
-      run: |
-        python sud9_report.py
-        echo "final_os=$(cat sud9_evolution.json | jq -r '.final_os')" >> $GITHUB_OUTPUT
-        
-    # ✅ **v1.7.0に修正** (動的バッジ)
-    - name: 📈 Update Tensor OS Badge
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      uses: schneegans/dynamic-badges-action@v1.7.0
-      with:
-        auth: ${{ secrets.GIST_SECRET }}
-        gistID: ${{ secrets.GIST_ID }}
-        filename: sud9-os.json
-        label: Tensor OS
-        message: ${{ steps.report.outputs.final_os }}
-        color: brightgreen
-        valColorRange: ${{ steps.report.outputs.final_os }}
-        minColorRange: '25.0'
-        maxColorRange: '35.0'
-        
-    - name: 📤 Upload Artifacts
+    - name: 📤 成果物
       uses: actions/upload-artifact@v4
       with:
-        name: sud9-videos-${{ github.run_number }}
+        name: sud9-results
         path: |
-          *.mp4
-          *.png
-          sud9_evolution.json
-        retention-days: 15
-
-    - name: 🌟 Deploy Demo Site
-      if: github.ref == 'refs/heads/main'
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./docs/
-        
-  notify:
-    needs: render-videos
-    runs-on: ubuntu-latest
-    if: always()
-    
-    steps:
-    - name: 📱 Discord Notify
-      if: env.DISCORD_WEBHOOK != ''
-      uses: Ilshidur/action-discord@master
-      with:
-        args: |
-          🌌 **SUD9.0 Render Complete!**
-          **OS**: `${{ needs.render-videos.outputs.final_os }}`
-          **Status**: `${{ job.status }}`
-          **Run**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        webhook: ${{ secrets.DISCORD_WEBHOOK }}
-        
-    - name: 📧 Email Summary
-      if: failure()
-      uses: dawidd6/action-send-mail@v3
-      with:
-        server_address: smtp.gmail.com
-        server_port: 587
-        username: ${{ secrets.EMAIL_USERNAME }}
-        password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: '[SUD9.0] Video Render FAILED'
-        to: your-email@example.com
-        from: github-actions@noreply.github.com
-        body: |
-          SUD9.0 video rendering failed!
-          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          sud9_result.json
+          sud9_plot.png
